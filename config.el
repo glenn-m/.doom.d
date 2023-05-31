@@ -71,3 +71,33 @@
 
 ;; Fix dired opening a ton of buffers
 (setf dired-kill-when-opening-new-dired-buffer t)
+
+;; Fix bug https://discourse.doomemacs.org/t/recentf-cleanup-logs-a-lot-of-error-messages/3273/5
+(after! tramp (advice-add 'doom--recentf-file-truename-fn :override
+                          (defun my-recent-truename (file &rest _args)
+                            (if (or (not (file-remote-p file)) (equal "sudo" (file-remote-p file 'method)))
+                                (abbreviate-file-name (file-truename (tramp-file-local-name file)))
+                              file))))
+
+;; Accept completion from copilot and fallback to company
+(use-package! copilot
+  :hook (prog-mode . copilot-mode)
+  :bind (:map copilot-completion-map
+              ("<tab>" . 'copilot-accept-completion)
+              ("TAB" . 'copilot-accept-completion)
+              ("C-TAB" . 'copilot-accept-completion-by-word)
+              ("C-<tab>" . 'copilot-accept-completion-by-word)))
+
+
+;; Create a new Git branch based on format: <name>/<shortcut-story>/<description>
+(defun gm/create-shortcut-git-branch (source-branch shortcut-story description)
+  "Create a new Git branch based on format: <name>/<shortcut-story>/<description>"
+  (interactive "sSource branch: \nsShortcut story: \nsDescription: ")
+  (magit-with-toplevel
+   (let* ((template-ref (concat "refs/heads/" source-branch))
+          (full-name (replace-regexp-in-string " " "" (downcase gm/user)))
+          (new-branch-name (format "%s/%s/%s" full-name shortcut-story description))
+          (git-command (format "git checkout -b %s %s" new-branch-name template-ref)))
+     (shell-command git-command)
+     (magit-refresh)
+     (message "Created branch '%s' based on template branch '%s'" new-branch-name template-branch))))
